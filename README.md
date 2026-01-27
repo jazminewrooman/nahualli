@@ -110,27 +110,137 @@ VITE_PINATA_JWT=your_pinata_jwt_token
 ## 📁 Project Structure
 
 ```
-src/
-├── components/          # UI components (Header, WalletProvider)
-├── pages/
-│   ├── Landing.tsx      # Home page
-│   ├── TestSelection.tsx # Choose test type
-│   ├── GenericAssessment.tsx # Test-taking flow
-│   ├── History.tsx      # View all completed tests
-│   ├── Interpretation.tsx # View latest interpretation
-│   └── Proofs.tsx       # ZK proof generation (WIP)
-├── lib/
-│   ├── encryption.ts    # AES-GCM encryption utilities
-│   ├── ipfs.ts          # Pinata IPFS integration
-│   ├── solana-storage.ts # Memo Program integration
-│   ├── arcium.ts        # Arcium MXE client
-│   ├── interpretations.ts # Personality interpretations
-│   ├── big5-questions.ts # Big Five test
-│   ├── disc-questions.ts # DISC test
-│   ├── mbti-questions.ts # MBTI test
-│   └── enneagram-questions.ts # Enneagram test
-└── hooks/
-    └── useEncryptedStorage.ts # Main storage hook
+nahualli/                    # Root project
+├── src/                     # React Frontend
+│   ├── components/          # UI components (Header, WalletProvider)
+│   ├── pages/
+│   │   ├── Landing.tsx      # Home page
+│   │   ├── TestSelection.tsx # Choose test type
+│   │   ├── GenericAssessment.tsx # Test-taking flow
+│   │   ├── History.tsx      # View all completed tests
+│   │   ├── Interpretation.tsx # View latest interpretation
+│   │   └── Proofs.tsx       # ZK proof generation (WIP)
+│   ├── lib/
+│   │   ├── encryption.ts    # AES-GCM encryption utilities
+│   │   ├── ipfs.ts          # Pinata IPFS integration
+│   │   ├── solana-storage.ts # Memo Program integration
+│   │   ├── arcium.ts        # Arcium MXE client (frontend)
+│   │   ├── interpretations.ts # Personality interpretations
+│   │   └── *-questions.ts   # Test definitions
+│   └── hooks/
+│       └── useEncryptedStorage.ts # Main storage hook
+│
+└── nahualli/                # Anchor Program (Arcium Integration)
+    ├── programs/nahualli/src/lib.rs  # Solana program with Arcium
+    ├── encrypted-ixs/src/lib.rs      # Confidential compute circuit
+    ├── Anchor.toml          # Anchor config (deployed to devnet)
+    ├── Arcium.toml          # Arcium MXE configuration
+    └── tests/nahualli.ts    # Integration tests
+```
+
+## 🔒 Arcium Integration
+
+The `nahualli/` subdirectory contains the **Solana Anchor program** with Arcium confidential compute integration.
+
+### Program ID (Devnet)
+```
+6idYUYvub9XZLFTchE711q18EE3AtejQR3qkX3SrwGFx
+```
+
+### Key Files
+
+#### `programs/nahualli/src/lib.rs` - Anchor Program
+The main Solana program that:
+- Initializes computation definitions for Arcium MXE
+- Queues encrypted psychometric scores for confidential processing
+- Handles callbacks with encrypted results
+
+```rust
+#[arcium_program]
+pub mod nahualli {
+    /// Submit psychometric scores for confidential processing
+    /// Generic: works with Big-5, DISC, MBTI, or any test with up to 8 scores
+    pub fn process_scores(
+        ctx: Context<ProcessScores>,
+        computation_offset: u64,
+        encrypted_scores: [u8; 32],  // Encrypted Pack<[u8; 8]>
+        num_scores: u8,
+        pubkey: [u8; 32],
+        nonce: u128,
+    ) -> Result<()> { ... }
+
+    /// Callback when score processing is complete
+    #[arcium_callback(encrypted_ix = "process_scores")]
+    pub fn process_scores_callback(...) -> Result<()> { ... }
+}
+```
+
+#### `encrypted-ixs/src/lib.rs` - Confidential Circuit
+The encrypted instruction that runs inside Arcium's MXE (Multi-party Execution Environment):
+
+```rust
+#[encrypted]
+mod circuits {
+    /// Generic psychometric score processor
+    /// Runs inside MXE - data never exposed in plaintext
+    #[instruction]
+    pub fn process_scores(
+        scores: Enc<Shared, Pack<[u8; 8]>>,
+        num_scores: u8,
+    ) -> Enc<Shared, Pack<[u8; 2]>> {
+        let s = scores.to_arcis().unpack();
+        let sum = s[0] + s[1] + s[2] + s[3] + s[4] + s[5] + s[6] + s[7];
+        let result = Pack::new([sum, num_scores]);
+        scores.owner.from_arcis(result)
+    }
+}
+```
+
+#### `Arcium.toml` - MXE Configuration
+```toml
+[localnet]
+nodes = 2
+backends = ["Cerberus"]
+
+[clusters.devnet]
+offset = 456
+```
+
+### Running Arcium Locally
+
+```bash
+cd nahualli
+
+# Start Arcium localnet (requires Docker)
+arcium localnet start
+
+# Build and deploy
+anchor build
+arcium deploy
+
+# Run tests
+anchor test
+```
+
+### How It Works
+
+1. **Frontend** encrypts test scores using X25519 key exchange
+2. **Anchor program** queues the encrypted data to Arcium MXE
+3. **MXE nodes** perform multi-party computation on encrypted data
+4. **Callback** receives encrypted results, stored on-chain
+5. **Only the user** can decrypt their results with their wallet
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Frontend  │────▶│   Anchor    │────▶│  Arcium MXE │
+│  (encrypt)  │     │  (queue TX) │     │  (compute)  │
+└─────────────┘     └─────────────┘     └─────────────┘
+                           │                    │
+                           ▼                    ▼
+                    ┌─────────────┐     ┌─────────────┐
+                    │   Solana    │◀────│  Callback   │
+                    │  (storage)  │     │  (results)  │
+                    └─────────────┘     └─────────────┘
 ```
 
 ## 🎯 Roadmap

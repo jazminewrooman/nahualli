@@ -1,22 +1,25 @@
 import { useState } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Shield, CheckCircle, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Shield, CheckCircle, Loader2, Lock, Send, Cpu, Sparkles } from 'lucide-react'
 import { BIG5_QUESTIONS, calculateScores, getTraitLabel, getTraitDescription } from '../lib/big5-questions'
 import type { TestResult } from '../lib/big5-questions'
 import { Header } from '../components/Header'
 import { useEncryptedStorage } from '../hooks/useEncryptedStorage'
+import { processWithArcium, storeInterpretation, type ProcessingStatus, DEMO_MODE } from '../lib/arcium'
 
-type AssessmentStep = 'intro' | 'questions' | 'saving' | 'results'
+type AssessmentStep = 'intro' | 'questions' | 'processing' | 'results'
 
 export function Assessment() {
-  const { connected } = useWallet()
-  const { saveTestResult, isLoading: isSaving } = useEncryptedStorage()
+  const { connected, publicKey } = useWallet()
+  const { saveTestResult } = useEncryptedStorage()
   const [step, setStep] = useState<AssessmentStep>('intro')
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<number, number>>({})
   const [results, setResults] = useState<TestResult | null>(null)
   const [savedHash, setSavedHash] = useState<string | null>(null)
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>('idle')
+  const [processingMessage, setProcessingMessage] = useState<string>('')
 
   const handleAnswer = async (value: number) => {
     const question = BIG5_QUESTIONS[currentQuestion]
@@ -28,12 +31,29 @@ export function Assessment() {
     } else {
       const scores = calculateScores(newAnswers)
       setResults(scores)
-      setStep('saving')
+      setStep('processing')
       
+      // Process with Arcium (demo mode or real)
+      const walletAddress = publicKey?.toBase58() || 'anonymous'
+      
+      const arciumResult = await processWithArcium(
+        scores,
+        walletAddress,
+        (status, message) => {
+          setProcessingStatus(status)
+          setProcessingMessage(message || '')
+        }
+      )
+      
+      // Store interpretation
+      storeInterpretation(walletAddress, arciumResult)
+      
+      // Also save to IPFS
       const stored = await saveTestResult('big5', newAnswers, scores)
       if (stored) {
         setSavedHash(stored.ipfsHash)
       }
+      
       setStep('results')
     }
   }
@@ -187,18 +207,79 @@ export function Assessment() {
     )
   }
 
-  if (step === 'saving') {
+  if (step === 'processing') {
+    const steps = [
+      { id: 'encrypting', label: 'Encrypting data', icon: Lock },
+      { id: 'submitting', label: 'Submitting to Solana', icon: Send },
+      { id: 'processing', label: 'Arcium MXE processing', icon: Cpu },
+      { id: 'complete', label: 'Complete', icon: Sparkles },
+    ]
+
+    const currentStepIndex = steps.findIndex(s => s.id === processingStatus)
+
     return (
       <div className="min-h-screen bg-cream">
         <Header />
-        <div className="pt-32 px-6 text-center">
-          <Loader2 className="w-16 h-16 mx-auto text-teal mb-6 animate-spin" />
-          <h1 className="font-serif text-3xl font-bold text-brown mb-4">
-            Encrypting & Storing
+        <div className="pt-32 px-6 max-w-md mx-auto text-center">
+          <div className="w-20 h-20 mx-auto mb-6 bg-teal/10 rounded-full flex items-center justify-center">
+            {processingStatus === 'complete' ? (
+              <Sparkles className="w-10 h-10 text-teal" />
+            ) : (
+              <Loader2 className="w-10 h-10 text-teal animate-spin" />
+            )}
+          </div>
+          
+          <h1 className="font-serif text-3xl font-bold text-brown mb-2">
+            {processingStatus === 'complete' ? 'Processing Complete!' : 'Confidential Processing'}
           </h1>
-          <p className="text-brown-light max-w-md mx-auto">
-            Your results are being encrypted and stored securely. This may take a moment...
+          <p className="text-brown-light mb-8">
+            {processingMessage || 'Your data is being processed securely...'}
           </p>
+
+          {/* Progress Steps */}
+          <div className="bg-white rounded-2xl shadow-lg p-6 text-left">
+            <div className="space-y-4">
+              {steps.map((s, index) => {
+                const Icon = s.icon
+                const isActive = s.id === processingStatus
+                const isComplete = index < currentStepIndex || processingStatus === 'complete'
+                
+                return (
+                  <div 
+                    key={s.id}
+                    className={`flex items-center gap-4 p-3 rounded-xl transition-all ${
+                      isActive ? 'bg-teal/10' : ''
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      isComplete ? 'bg-teal text-white' : 
+                      isActive ? 'bg-teal/20 text-teal' : 
+                      'bg-cream-dark text-brown-light'
+                    }`}>
+                      {isComplete ? (
+                        <CheckCircle className="w-5 h-5" />
+                      ) : isActive ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Icon className="w-5 h-5" />
+                      )}
+                    </div>
+                    <span className={`font-medium ${
+                      isActive || isComplete ? 'text-brown' : 'text-brown-light'
+                    }`}>
+                      {s.label}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {DEMO_MODE && (
+            <p className="text-xs text-brown-light/50 mt-6">
+              Demo mode: accelerated processing for demonstration
+            </p>
+          )}
         </div>
       </div>
     )

@@ -4,23 +4,27 @@ import { Link } from 'react-router-dom'
 import { Shield, Sparkles, Briefcase, MessageSquare, Loader2, Lock, TrendingUp, AlertCircle } from 'lucide-react'
 import { Header } from '../components/Header'
 import { useEncryptedStorage } from '../hooks/useEncryptedStorage'
-import { processWithArcium, getStoredInterpretation, storeInterpretation } from '../lib/arcium'
-import type { ArciumProcessingResult } from '../lib/arcium'
-import type { TestResult } from '../lib/big5-questions'
+import type { PersonalityInterpretation } from '../lib/interpretations'
+import { generateInterpretation, type AnyTestResult } from '../lib/interpretations'
 
 export function Interpretation() {
   const { publicKey, connected } = useWallet()
   const { getMyResults, loadTestResult } = useEncryptedStorage()
-  const [interpretation, setInterpretation] = useState<ArciumProcessingResult | null>(null)
+  const [interpretation, setInterpretation] = useState<PersonalityInterpretation | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [hasResults, setHasResults] = useState(false)
-  const [scores, setScores] = useState<TestResult | null>(null)
+  const [, setTestType] = useState<string>('big5')
 
   useEffect(() => {
     if (publicKey) {
-      const stored = getStoredInterpretation(publicKey.toBase58())
+      // Load stored interpretation
+      const stored = localStorage.getItem(`nahualli_interpretation_${publicKey.toBase58()}`)
       if (stored) {
-        setInterpretation(stored)
+        try {
+          setInterpretation(JSON.parse(stored))
+        } catch (e) {
+          console.warn('Failed to parse stored interpretation')
+        }
       }
       loadLatestResults()
     }
@@ -31,21 +35,36 @@ export function Interpretation() {
     if (myResults.length > 0) {
       setHasResults(true)
       const latest = myResults[myResults.length - 1]
+      setTestType(latest.testType || 'big5')
       const data = await loadTestResult(latest.ipfsHash)
       if (data && 'scores' in data) {
-        setScores(data.scores as TestResult)
+        // Generate interpretation if not already stored
+        if (!interpretation) {
+          const interp = generateInterpretation(latest.testType || 'big5', data.scores as AnyTestResult)
+          setInterpretation(interp)
+          if (publicKey) {
+            localStorage.setItem(`nahualli_interpretation_${publicKey.toBase58()}`, JSON.stringify(interp))
+          }
+        }
       }
     }
   }
 
   const handleGenerateInterpretation = async () => {
-    if (!publicKey || !scores) return
+    if (!publicKey) return
     
     setIsProcessing(true)
     try {
-      const result = await processWithArcium(scores, publicKey.toBase58())
-      storeInterpretation(publicKey.toBase58(), result)
-      setInterpretation(result)
+      const myResults = getMyResults()
+      if (myResults.length > 0) {
+        const latest = myResults[myResults.length - 1]
+        const data = await loadTestResult(latest.ipfsHash)
+        if (data && 'scores' in data) {
+          const interp = generateInterpretation(latest.testType || 'big5', data.scores as AnyTestResult)
+          setInterpretation(interp)
+          localStorage.setItem(`nahualli_interpretation_${publicKey.toBase58()}`, JSON.stringify(interp))
+        }
+      }
     } catch (error) {
       console.error('Failed to process interpretation:', error)
     } finally {
@@ -169,7 +188,12 @@ export function Interpretation() {
     )
   }
 
-  const { interpretation: interp, processingId, encryptedInputHash } = interpretation
+  const testLabels: Record<string, string> = {
+    big5: 'Big Five',
+    disc: 'DISC',
+    mbti: 'MBTI',
+    enneagram: 'Enneagram'
+  }
 
   return (
     <div className="min-h-screen bg-cream">
@@ -178,10 +202,10 @@ export function Interpretation() {
         <div className="text-center mb-12">
           <Sparkles className="w-12 h-12 mx-auto text-gold mb-4" />
           <h1 className="font-serif text-3xl font-bold text-brown mb-2">
-            Your Personality Interpretation
+            Your {testLabels[interpretation.testType] || 'Personality'} Interpretation
           </h1>
           <p className="text-brown-light text-sm">
-            Confidentially processed • ID: {processingId}
+            Confidentially processed via Arcium MXE
           </p>
         </div>
 
@@ -191,7 +215,7 @@ export function Interpretation() {
             Summary
           </h2>
           <p className="text-brown-light leading-relaxed">
-            {interp.summary}
+            {interpretation.summary}
           </p>
         </div>
 
@@ -203,7 +227,7 @@ export function Interpretation() {
               Key Strengths
             </h2>
             <ul className="space-y-3">
-              {interp.strengths.map((strength, i) => (
+              {interpretation.strengths.map((strength, i) => (
                 <li key={i} className="flex items-start gap-2 text-brown-light text-sm">
                   <span className="text-teal font-bold">•</span>
                   {strength}
@@ -218,7 +242,7 @@ export function Interpretation() {
               Growth Areas
             </h2>
             <ul className="space-y-3">
-              {interp.growthAreas.map((area, i) => (
+              {interpretation.growthAreas.map((area, i) => (
                 <li key={i} className="flex items-start gap-2 text-brown-light text-sm">
                   <span className="text-gold font-bold">•</span>
                   {area}
@@ -235,7 +259,7 @@ export function Interpretation() {
             Career Recommendations
           </h2>
           <div className="flex flex-wrap gap-2">
-            {interp.careerRecommendations.map((career, i) => (
+            {interpretation.careerRecommendations.map((career, i) => (
               <span 
                 key={i}
                 className="px-4 py-2 bg-teal/10 text-teal rounded-full text-sm font-medium"
@@ -254,7 +278,7 @@ export function Interpretation() {
               Communication Style
             </h2>
             <p className="text-brown-light text-sm leading-relaxed">
-              {interp.communicationStyle}
+              {interpretation.communicationStyle}
             </p>
           </div>
 
@@ -264,7 +288,7 @@ export function Interpretation() {
               Work Style
             </h2>
             <p className="text-brown-light text-sm leading-relaxed">
-              {interp.workStyle}
+              {interpretation.workStyle}
             </p>
           </div>
         </div>
@@ -273,10 +297,7 @@ export function Interpretation() {
         <div className="bg-cream-dark/50 rounded-xl p-4 text-center">
           <div className="flex items-center justify-center gap-2 text-sm text-brown-light">
             <Lock className="w-4 h-4 text-teal" />
-            <span>Processed confidentially via Arcium</span>
-            <span className="text-xs font-mono opacity-60">
-              Hash: {encryptedInputHash}
-            </span>
+            <span>Processed confidentially via Arcium MXE</span>
           </div>
         </div>
 
@@ -288,12 +309,12 @@ export function Interpretation() {
           >
             Generate ZK Proof
           </Link>
-          <button 
-            onClick={handleGenerateInterpretation}
-            className="border-2 border-brown text-brown px-8 py-4 rounded-full font-semibold hover:bg-brown hover:text-cream transition-colors"
+          <Link 
+            to="/tests"
+            className="border-2 border-brown text-brown px-8 py-4 rounded-full font-semibold hover:bg-brown hover:text-cream transition-colors text-center"
           >
-            Regenerate
-          </button>
+            Take Another Test
+          </Link>
         </div>
       </div>
     </div>

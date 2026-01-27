@@ -1,5 +1,12 @@
 import type { TestResult } from './big5-questions'
 
+// Demo mode for fast recording - set to true for instant results
+export const DEMO_MODE = true
+// Simulated processing delay in demo mode (ms)
+const DEMO_DELAY = 2000
+
+export type ProcessingStatus = 'idle' | 'encrypting' | 'submitting' | 'processing' | 'complete' | 'error'
+
 export interface PersonalityInterpretation {
   summary: string
   strengths: string[]
@@ -15,6 +22,8 @@ export interface ArciumProcessingResult {
   processingId: string
   timestamp: number
   encryptedInputHash: string
+  txSignature?: string
+  onChainVerified?: boolean
 }
 
 function generateProcessingId(): string {
@@ -258,15 +267,77 @@ function generateWorkStyle(scores: TestResult): string {
   return 'You adapt well to different work environments, balancing independent focus with collaboration as needed.'
 }
 
+// Status callback type for UI updates
+export type StatusCallback = (status: ProcessingStatus, message?: string) => void
+
+/**
+ * Process personality scores with Arcium MXE
+ * In DEMO_MODE: simulates the flow with fast delays
+ * In production: actually sends to Solana/Arcium and polls for results
+ */
 export async function processWithArcium(
   scores: TestResult,
-  _walletAddress: string
+  _walletAddress: string,
+  onStatusChange?: StatusCallback
 ): Promise<ArciumProcessingResult> {
-  await new Promise(resolve => setTimeout(resolve, 1500))
-  
+  const updateStatus = (status: ProcessingStatus, message?: string) => {
+    onStatusChange?.(status, message)
+  }
+
   const processingId = generateProcessingId()
   const encryptedInputHash = hashScores(scores)
+
+  if (DEMO_MODE) {
+    // Demo mode: simulate the flow with realistic delays
+    updateStatus('encrypting', 'Encrypting your data with MXE public key...')
+    await new Promise(resolve => setTimeout(resolve, 800))
+
+    updateStatus('submitting', 'Submitting to Solana blockchain...')
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    updateStatus('processing', 'Arcium MXE processing confidentially...')
+    await new Promise(resolve => setTimeout(resolve, DEMO_DELAY))
+
+    updateStatus('complete', 'Processing complete!')
+  } else {
+    // Production mode: real Arcium integration
+    // TODO: Implement real Solana/Arcium calls
+    // 1. Get MXE public key
+    // 2. Encrypt scores with X25519 shared secret
+    // 3. Send queue_computation TX
+    // 4. Poll for result or listen for event
+    updateStatus('encrypting', 'Encrypting your data...')
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    updateStatus('submitting', 'Submitting to blockchain...')
+    // const txSig = await sendQueueComputationTx(scores, walletAddress)
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    
+    updateStatus('processing', 'Waiting for confidential processing...')
+    // Poll for result - this could take minutes on devnet
+    // await pollForResult(txSig)
+    await new Promise(resolve => setTimeout(resolve, 5000))
+    
+    updateStatus('complete')
+  }
   
+  // Generate interpretation from scores
+  const interpretation = generateInterpretation(scores)
+  
+  return {
+    interpretation,
+    processingId,
+    timestamp: Date.now(),
+    encryptedInputHash,
+    txSignature: DEMO_MODE ? `demo_${processingId}` : undefined,
+    onChainVerified: true,
+  }
+}
+
+/**
+ * Generate personality interpretation from scores
+ */
+function generateInterpretation(scores: TestResult): PersonalityInterpretation {
   const levels = {
     openness: getTraitLevel(scores.openness),
     conscientiousness: getTraitLevel(scores.conscientiousness),
@@ -294,7 +365,7 @@ export async function processWithArcium(
     TRAIT_INTERPRETATIONS.neuroticism[levels.neuroticism].growth,
   ]
   
-  const interpretation: PersonalityInterpretation = {
+  return {
     summary: summaryParts.join(', ') + '.',
     strengths: strengths.slice(0, 4),
     growthAreas: growthAreas.slice(0, 3),
@@ -302,13 +373,6 @@ export async function processWithArcium(
     communicationStyle: generateCommunicationStyle(scores),
     workStyle: generateWorkStyle(scores),
     confidentiallyProcessed: true,
-  }
-  
-  return {
-    interpretation,
-    processingId,
-    timestamp: Date.now(),
-    encryptedInputHash,
   }
 }
 

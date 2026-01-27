@@ -1,4 +1,4 @@
-# Nahualli 
+# Nahualli 🦎
 
 **Your hidden self, cryptographically protected.**
 
@@ -6,28 +6,34 @@ Nahualli is a privacy-first psychometric assessment platform built on Solana. Ta
 
 > In Nahuatl culture, a *nahual* is a guardian spirit that can shapeshift to protect you. Nahualli does the same for your data — it transforms and hides your credentials, revealing only what you choose.
 
-## Features
+## ✨ Features
 
-- **End-to-End Encryption**: Your data is encrypted client-side before storage
-- **Adaptive Identity**: Reveal only what you choose, exactly when you choose
-- **Zero-Knowledge Proofs**: Prove your credentials without exposing any data
-- **AI-Powered Interpretation**: Get personality insights via confidential compute (Arcium)
-- **Decentralized Storage**: Results stored on IPFS, ownership on Solana
+- **4 Psychometric Tests**: Big Five, DISC, MBTI, and Enneagram assessments
+- **End-to-End Encryption**: AES-256-GCM encryption with wallet-derived keys
+- **Decentralized Storage**: Encrypted results stored on IPFS (Pinata)
+- **On-Chain Registry**: IPFS hashes stored on Solana via Memo Program
+- **Full Data Recovery**: Clear your browser, reconnect wallet, recover everything
+- **Personalized Interpretations**: Detailed personality insights for each test type
+- **Confidential Compute Ready**: Arcium MXE integration for private AI processing
 
-## Tech Stack
+## 🏗️ Tech Stack
 
-- **Frontend**: React + TypeScript + Vite + TailwindCSS
-- **Blockchain**: Solana (wallet adapter)
-- **Privacy**: Light Protocol (ZK proofs), Arcium (confidential compute)
-- **Storage**: IPFS (Web3.Storage)
-- **RPC**: Helius
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18 + TypeScript + Vite + TailwindCSS |
+| Blockchain | Solana (Wallet Adapter, Memo Program) |
+| Storage | IPFS via Pinata |
+| Encryption | AES-256-GCM (Web Crypto API) |
+| Privacy | Arcium MXE (confidential compute) |
+| RPC | Helius / Solana Devnet |
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- A Solana wallet (Phantom or Solflare)
+- A Solana wallet (Phantom recommended)
+- SOL on devnet for transactions (~0.001 SOL per test)
 
 ### Installation
 
@@ -43,56 +49,132 @@ npm install
 npm run dev
 ```
 
-### Environment Variables (Optional)
+### Environment Variables
 
-Create a `.env` file for IPFS storage:
+Create a `.env` file:
 
 ```env
-VITE_WEB3_STORAGE_TOKEN=your_web3_storage_token
+VITE_HELIUS_RPC_URL=https://devnet.helius-rpc.com/?api-key=YOUR_KEY
+VITE_PINATA_JWT=your_pinata_jwt_token
 ```
 
-## Usage
+**Getting API Keys:**
+- **Helius**: Free at [helius.dev](https://helius.dev)
+- **Pinata**: Free at [pinata.cloud](https://pinata.cloud) (enable Legacy API endpoints)
 
-1. **Connect Wallet**: Connect your Phantom or Solflare wallet
-2. **Take Assessment**: Complete the Big Five personality test (25 questions)
-3. **View Results**: See your encrypted results stored on-chain
-4. **Generate Proofs**: Create ZK proofs to share specific traits
-5. **Get Interpretation**: AI-powered personality analysis via Arcium
+## 📱 Usage
 
-## Privacy Architecture
+1. **Connect Wallet**: Connect your Phantom wallet
+2. **Sign Message**: Derive your encryption key (one-time, free)
+3. **Take Tests**: Complete any of the 4 personality assessments
+4. **View History**: See all your completed tests at `/history`
+5. **Sync from Chain**: Recover your data on any device by syncing from Solana
+
+## 🔐 Privacy Architecture
 
 ```
-User → Takes Test → Encrypted Client-Side → IPFS Storage
-                                         ↓
-                              Hash stored on Solana
-                                         ↓
-                    Light Protocol generates ZK proofs
-                                         ↓
-                    Share selectively without revealing data
+┌─────────────────────────────────────────────────────────────┐
+│                        USER FLOW                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. Connect Wallet                                          │
+│         ↓                                                   │
+│  2. Sign Message → Derive AES-256 Key (deterministic)       │
+│         ↓                                                   │
+│  3. Take Test → Encrypt Results (client-side)               │
+│         ↓                                                   │
+│  4. Upload to IPFS (Pinata) → Get CID                       │
+│         ↓                                                   │
+│  5. Store CID on Solana (Memo Program) → ~$0.001            │
+│         ↓                                                   │
+│  6. Generate Interpretation (local)                         │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                     DATA RECOVERY                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Clear Browser → Connect Wallet → Sync from Solana          │
+│         ↓                                                   │
+│  Sign Message → Regenerate Same Key → Decrypt from IPFS     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Hackathon Bounties
+**Key Security Properties:**
+- Encryption key derived from wallet signature (deterministic, recoverable)
+- Data encrypted before leaving your browser
+- Only you can decrypt your data (requires wallet signature)
+- IPFS provides content-addressed, immutable storage
+- Solana provides tamper-proof registry of your test history
 
-Built for the Solana Privacy Hackathon:
-
-- **Light Protocol** ($18k) - ZK proofs for selective disclosure
-- **Arcium** ($10k) - Confidential LLM interpretation
-- **Helius** ($5k) - RPC infrastructure
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 src/
-├── components/       # Reusable UI components
-├── pages/           # Page components
-├── lib/             # Core libraries
-└── hooks/           # Custom React hooks
+├── components/          # UI components (Header, WalletProvider)
+├── pages/
+│   ├── Landing.tsx      # Home page
+│   ├── TestSelection.tsx # Choose test type
+│   ├── GenericAssessment.tsx # Test-taking flow
+│   ├── History.tsx      # View all completed tests
+│   ├── Interpretation.tsx # View latest interpretation
+│   └── Proofs.tsx       # ZK proof generation (WIP)
+├── lib/
+│   ├── encryption.ts    # AES-GCM encryption utilities
+│   ├── ipfs.ts          # Pinata IPFS integration
+│   ├── solana-storage.ts # Memo Program integration
+│   ├── arcium.ts        # Arcium MXE client
+│   ├── interpretations.ts # Personality interpretations
+│   ├── big5-questions.ts # Big Five test
+│   ├── disc-questions.ts # DISC test
+│   ├── mbti-questions.ts # MBTI test
+│   └── enneagram-questions.ts # Enneagram test
+└── hooks/
+    └── useEncryptedStorage.ts # Main storage hook
 ```
 
-## License
+## 🎯 Roadmap
+
+- [x] Multi-test support (Big Five, DISC, MBTI, Enneagram)
+- [x] Client-side encryption with wallet-derived keys
+- [x] IPFS storage via Pinata
+- [x] On-chain registry via Solana Memo Program
+- [x] Full data recovery from blockchain
+- [x] Personalized interpretations per test type
+- [ ] ZK proofs for selective disclosure (Noir/Light Protocol)
+- [ ] PDF/Document upload with score extraction
+- [ ] Arcium real-time confidential compute
+- [ ] Enhanced landing page design
+
+## 🏆 Hackathon Bounties
+
+Built for the Solana Privacy Hackathon:
+
+| Bounty | Technology | Status |
+|--------|------------|--------|
+| Arcium ($10k) | Confidential compute | ✅ Integrated (demo mode) |
+| Light Protocol ($18k) | ZK proofs | 🔄 In progress |
+| Helius ($5k) | RPC infrastructure | ✅ Integrated |
+
+## 🧪 Testing
+
+```bash
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Get devnet SOL for testing
+# Visit: https://faucet.solana.com
+```
+
+## 📄 License
 
 MIT License
 
 ---
 
 **Built with 💚 for the Solana Privacy Hackathon 2025**
+
+*Nahualli - Protecting your digital spirit*

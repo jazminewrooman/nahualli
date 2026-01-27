@@ -1,11 +1,35 @@
 import { PublicKey } from '@solana/web3.js'
 
+// Message used to derive encryption key - must be constant
+const KEY_DERIVATION_MESSAGE = 'Nahualli: Sign this message to derive your encryption key. This does not cost gas.'
+
 export async function generateEncryptionKey(): Promise<CryptoKey> {
   return await crypto.subtle.generateKey(
     { name: 'AES-GCM', length: 256 },
     true,
     ['encrypt', 'decrypt']
   )
+}
+
+/**
+ * Derive a deterministic encryption key from a wallet signature
+ * This allows recovering the key by signing the same message again
+ */
+export async function deriveKeyFromSignature(signature: Uint8Array): Promise<CryptoKey> {
+  // Hash the signature to get a 256-bit key
+  const hashBuffer = await crypto.subtle.digest('SHA-256', signature.buffer as ArrayBuffer)
+  
+  return await crypto.subtle.importKey(
+    'raw',
+    hashBuffer,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  )
+}
+
+export function getKeyDerivationMessage(): string {
+  return KEY_DERIVATION_MESSAGE
 }
 
 export async function encryptData(data: string, key: CryptoKey): Promise<{ encrypted: ArrayBuffer; iv: Uint8Array }> {

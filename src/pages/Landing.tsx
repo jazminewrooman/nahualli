@@ -29,7 +29,7 @@ export function Landing() {
           </p>
           
           <Link 
-            to="/assessment"
+            to="/tests"
             className="inline-block bg-brown text-cream px-8 py-4 rounded-full font-semibold hover:bg-brown-light transition-colors text-lg"
           >
             Enter the Vault

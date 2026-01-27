@@ -1,6 +1,6 @@
 import type { EncryptedPayload } from './encryption'
 
-const IPFS_GATEWAY = 'https://w3s.link/ipfs'
+const PINATA_GATEWAY = 'https://gateway.pinata.cloud/ipfs'
 
 export interface StoredTestResult {
   ipfsHash: string
@@ -10,29 +10,44 @@ export interface StoredTestResult {
 }
 
 export async function uploadToIPFS(encryptedPayload: EncryptedPayload): Promise<string> {
-  const blob = new Blob([JSON.stringify(encryptedPayload)], { type: 'application/json' })
+  const jwt = import.meta.env.VITE_PINATA_JWT
   
-  const formData = new FormData()
-  formData.append('file', blob, 'encrypted-result.json')
+  if (!jwt) {
+    console.warn('Pinata JWT not configured, using local storage')
+    throw new Error('IPFS not configured')
+  }
 
-  const response = await fetch('https://api.web3.storage/upload', {
+  console.log('Uploading to Pinata...')
+  
+  // Use pinFileToIPFS endpoint with form data (works with scoped keys)
+  const blob = new Blob([JSON.stringify(encryptedPayload)], { type: 'application/json' })
+  const formData = new FormData()
+  formData.append('file', blob, `nahualli-${Date.now()}.json`)
+  formData.append('pinataMetadata', JSON.stringify({
+    name: `nahualli-result-${Date.now()}`
+  }))
+
+  const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_WEB3_STORAGE_TOKEN || ''}`,
+      'Authorization': `Bearer ${jwt}`,
     },
     body: formData,
   })
 
   if (!response.ok) {
-    throw new Error(`Failed to upload to IPFS: ${response.statusText}`)
+    const error = await response.text()
+    console.error('Pinata error:', error)
+    throw new Error(`Failed to upload to IPFS: ${error}`)
   }
 
   const result = await response.json()
-  return result.cid
+  console.log('Uploaded to IPFS:', result.IpfsHash)
+  return result.IpfsHash
 }
 
 export async function fetchFromIPFS(cid: string): Promise<EncryptedPayload> {
-  const response = await fetch(`${IPFS_GATEWAY}/${cid}`)
+  const response = await fetch(`${PINATA_GATEWAY}/${cid}`)
   
   if (!response.ok) {
     throw new Error(`Failed to fetch from IPFS: ${response.statusText}`)
@@ -42,7 +57,7 @@ export async function fetchFromIPFS(cid: string): Promise<EncryptedPayload> {
 }
 
 export function getIPFSUrl(cid: string): string {
-  return `${IPFS_GATEWAY}/${cid}`
+  return `${PINATA_GATEWAY}/${cid}`
 }
 
 export function storeLocalResult(result: StoredTestResult): void {

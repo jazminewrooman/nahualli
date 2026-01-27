@@ -25,16 +25,16 @@ export function Header() {
           ) : connected && (
             <>
               <Link 
-                to="/assessment" 
-                className={`transition-colors ${location.pathname === '/assessment' ? 'text-brown font-medium' : 'text-brown-light hover:text-brown'}`}
+                to="/tests" 
+                className={`transition-colors ${location.pathname === '/tests' || location.pathname.startsWith('/assessment') ? 'text-brown font-medium' : 'text-brown-light hover:text-brown'}`}
               >
-                Assessment
+                Tests
               </Link>
               <Link 
-                to="/interpretation" 
-                className={`transition-colors ${location.pathname === '/interpretation' ? 'text-brown font-medium' : 'text-brown-light hover:text-brown'}`}
+                to="/history" 
+                className={`transition-colors ${location.pathname === '/history' ? 'text-brown font-medium' : 'text-brown-light hover:text-brown'}`}
               >
-                Interpretation
+                History
               </Link>
               <Link 
                 to="/proofs" 

@@ -133,7 +133,9 @@ export function useEncryptedStorage() {
     setError(null)
 
     try {
+      console.log('loadTestResult: getting key for', ipfsHash)
       const key = await getOrCreateKey()
+      console.log('loadTestResult: got key')
       
       let encryptedPayload: EncryptedPayload
 
@@ -142,12 +144,17 @@ export function useEncryptedStorage() {
         if (!stored) throw new Error('Local data not found')
         encryptedPayload = JSON.parse(stored)
       } else {
+        console.log('loadTestResult: fetching from IPFS')
         encryptedPayload = await fetchFromIPFS(ipfsHash)
+        console.log('loadTestResult: fetched payload', encryptedPayload ? 'success' : 'null')
       }
 
+      console.log('loadTestResult: decrypting')
       const decrypted = await decryptFromStorage(encryptedPayload, key)
+      console.log('loadTestResult: decrypted', decrypted ? 'success' : 'null')
       return decrypted
     } catch (err) {
+      console.error('loadTestResult error:', err)
       const message = err instanceof Error ? err.message : 'Failed to load result'
       setError(message)
       return null

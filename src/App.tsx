@@ -6,6 +6,7 @@ import { GenericAssessment } from './pages/GenericAssessment'
 import { Proofs } from './pages/Proofs'
 import { Interpretation } from './pages/Interpretation'
 import { History } from './pages/History'
+import { Verify } from './pages/Verify'
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/proofs" element={<Proofs />} />
           <Route path="/interpretation" element={<Interpretation />} />
           <Route path="/history" element={<History />} />
+          <Route path="/verify/:ipfsHash" element={<Verify />} />
         </Routes>
       </WalletProvider>
     </BrowserRouter>

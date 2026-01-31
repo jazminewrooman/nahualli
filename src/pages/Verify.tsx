@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { CheckCircle, ExternalLink, Clock, User, Loader2, AlertTriangle } from 'lucide-react'
+import { CheckCircle, ExternalLink, Clock, User, Loader2, AlertTriangle, Ban } from 'lucide-react'
 import { fetchZKProofFromIPFS, getIPFSUrl } from '../lib/ipfs'
-import { getExplorerUrl } from '../lib/solana-storage'
+import { getExplorerUrl, isProofRevoked } from '../lib/solana-storage'
 
 interface ProofData {
   id: string
@@ -46,6 +46,8 @@ export function Verify() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [, setProofSource] = useState<'ipfs' | 'query'>('ipfs')
+  const [revocationStatus, setRevocationStatus] = useState<{ revoked: boolean; revokedAt?: number } | null>(null)
+  const [checkingRevocation, setCheckingRevocation] = useState(false)
 
   useEffect(() => {
     async function loadProof() {
@@ -115,6 +117,26 @@ export function Verify() {
     loadProof()
   }, [ipfsHash, searchParams])
 
+  // Check revocation status when proof is loaded
+  useEffect(() => {
+    async function checkRevocation() {
+      if (!proof || !ipfsHash || !proof.walletAddress) return
+      
+      setCheckingRevocation(true)
+      try {
+        const status = await isProofRevoked(ipfsHash, proof.walletAddress)
+        setRevocationStatus(status)
+      } catch (error) {
+        console.error('Failed to check revocation:', error)
+        setRevocationStatus({ revoked: false })
+      } finally {
+        setCheckingRevocation(false)
+      }
+    }
+    
+    checkRevocation()
+  }, [proof, ipfsHash])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-cream to-cream-dark flex items-center justify-center">
@@ -173,7 +195,17 @@ export function Verify() {
         {/* Verification Badge */}
         <div className="bg-white rounded-2xl p-8 shadow-lg mb-6">
           <div className="flex items-center justify-center mb-6">
-            {isNoirProof ? (
+            {revocationStatus?.revoked ? (
+              <div className="flex items-center gap-3 bg-red-100 text-red-600 px-6 py-3 rounded-full">
+                <Ban className="w-8 h-8" />
+                <span className="text-xl font-bold">Proof Revoked</span>
+              </div>
+            ) : checkingRevocation ? (
+              <div className="flex items-center gap-3 bg-gray-100 text-gray-600 px-6 py-3 rounded-full">
+                <Loader2 className="w-8 h-8 animate-spin" />
+                <span className="text-xl font-bold">Checking status...</span>
+              </div>
+            ) : isNoirProof ? (
               <div className="flex items-center gap-3 bg-teal/10 text-teal px-6 py-3 rounded-full">
                 <CheckCircle className="w-8 h-8" />
                 <span className="text-xl font-bold">Verified ZK Proof</span>
@@ -185,6 +217,18 @@ export function Verify() {
               </div>
             )}
           </div>
+          
+          {/* Revocation Notice */}
+          {revocationStatus?.revoked && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-center">
+              <p className="text-red-600 font-medium">
+                This proof was revoked by the owner on {revocationStatus.revokedAt ? formatDate(revocationStatus.revokedAt) : 'unknown date'}.
+              </p>
+              <p className="text-red-500 text-sm mt-1">
+                The information below is no longer valid.
+              </p>
+            </div>
+          )}
 
           {/* Statement */}
           <div className="text-center mb-8">

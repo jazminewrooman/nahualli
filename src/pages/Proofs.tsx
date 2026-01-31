@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useWallet } from '@solana/wallet-adapter-react'
-import { Shield, Plus, Copy, Check, Clock, Loader2, Zap, ExternalLink } from 'lucide-react'
+import { Shield, Plus, Copy, Check, Clock, Loader2, Zap, ExternalLink, Ban, QrCode } from 'lucide-react'
 import { Header } from '../components/Header'
-import { useToast } from '../components/Toast'
+import { useToast, ConfirmModal, QRModal } from '../components/Toast'
 import { useEncryptedStorage } from '../hooks/useEncryptedStorage'
 import { 
   generateZKProofAsync, 
@@ -13,7 +13,7 @@ import {
   verifyZKProof
 } from '../lib/zkproofs'
 import { uploadZKProofToIPFS, fetchZKProofFromIPFS } from '../lib/ipfs'
-import { storeZKProofOnChain, fetchZKProofsFromChain, getExplorerUrl } from '../lib/solana-storage'
+import { storeZKProofOnChain, fetchZKProofsFromChain, getExplorerUrl, revokeProofOnChain, fetchRevokedProofs } from '../lib/solana-storage'
 import type { ZKProof, ProofType } from '../lib/zkproofs'
 import type { TestResult } from '../lib/big5-questions'
 
@@ -71,6 +71,10 @@ export function Proofs() {
   const [showGenerator, setShowGenerator] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [isSavingToChain, setIsSavingToChain] = useState(false)
+  const [revokedHashes, setRevokedHashes] = useState<string[]>([])
+  const [revokingId, setRevokingId] = useState<string | null>(null)
+  const [proofToRevoke, setProofToRevoke] = useState<ZKProof | null>(null)
+  const [qrProof, setQrProof] = useState<{ url: string; title: string } | null>(null)
   
   // All available tests that can be decrypted
   const [availableTests, setAvailableTests] = useState<LoadedTest[]>([])
@@ -94,8 +98,19 @@ export function Proofs() {
     if (publicKey) {
       setProofs(getProofsByWallet(publicKey.toBase58()))
       loadAllTests()
+      loadRevokedProofs()
     }
   }, [publicKey])
+
+  const loadRevokedProofs = async () => {
+    if (!publicKey) return
+    try {
+      const revoked = await fetchRevokedProofs(publicKey.toBase58())
+      setRevokedHashes(revoked)
+    } catch (error) {
+      console.error('Failed to load revoked proofs:', error)
+    }
+  }
 
   // When test selection changes, update default trait
   useEffect(() => {
@@ -136,6 +151,39 @@ export function Proofs() {
     setSelectedTestIndex(0)
     
     console.log('Loaded tests:', loaded.length)
+  }
+
+  const handleRevokeProof = (proof: ZKProof) => {
+    if (!publicKey || !signTransaction || !proof.ipfsHash) {
+      showToast('Cannot revoke: proof not stored on IPFS', 'error')
+      return
+    }
+    // Open confirmation modal
+    setProofToRevoke(proof)
+  }
+
+  const confirmRevoke = async () => {
+    if (!proofToRevoke || !publicKey || !signTransaction || !proofToRevoke.ipfsHash) return
+    
+    setProofToRevoke(null) // Close modal
+    setRevokingId(proofToRevoke.id)
+    
+    try {
+      const signature = await revokeProofOnChain(
+        proofToRevoke.ipfsHash,
+        signTransaction,
+        publicKey
+      )
+      
+      // Update local state
+      setRevokedHashes(prev => [...prev, proofToRevoke.ipfsHash!])
+      showToast('Proof revoked successfully! Transaction: ' + signature.slice(0, 8) + '...', 'success')
+    } catch (error) {
+      console.error('Failed to revoke proof:', error)
+      showToast('Failed to revoke proof. Please try again.', 'error')
+    } finally {
+      setRevokingId(null)
+    }
   }
 
   const handleGenerateProof = async () => {
@@ -274,6 +322,13 @@ export function Proofs() {
     setCopiedId(proof.id)
     showToast('Verification link copied!', 'success')
     setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const showQRCode = (proof: ZKProof) => {
+    const link = proof.ipfsHash 
+      ? `${window.location.origin}/verify/${proof.ipfsHash}`
+      : generateShareableLink(proof)
+    setQrProof({ url: link, title: proof.statement })
   }
 
   const formatDate = (timestamp: number) => {
@@ -433,6 +488,22 @@ export function Proofs() {
     <div className="min-h-screen bg-cream">
       <Header />
       <ToastWrapper />
+      <ConfirmModal
+        isOpen={!!proofToRevoke}
+        title="Revoke Proof"
+        message="Are you sure you want to revoke this proof? This action is permanent and will be recorded on Solana. Anyone with the link will see it as revoked."
+        confirmText="Revoke"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={confirmRevoke}
+        onCancel={() => setProofToRevoke(null)}
+      />
+      <QRModal
+        isOpen={!!qrProof}
+        url={qrProof?.url || ''}
+        title={qrProof?.title || ''}
+        onClose={() => setQrProof(null)}
+      />
       <div className="pt-28 px-6 max-w-4xl mx-auto pb-16">
         <div className="flex justify-between items-center mb-8">
           <div>
@@ -630,36 +701,65 @@ export function Proofs() {
             {proofs.map((proof) => {
               const verification = verifyZKProof(proof)
               const isExpired = proof.expiresAt && Date.now() > proof.expiresAt
+              const isRevoked = proof.ipfsHash && revokedHashes.includes(proof.ipfsHash)
+              const isRevoking = revokingId === proof.id
 
               return (
                 <div 
                   key={proof.id}
-                  className={`bg-white rounded-2xl p-6 shadow-sm ${isExpired ? 'opacity-60' : ''}`}
+                  className={`bg-white rounded-2xl p-6 shadow-sm ${isExpired || isRevoked ? 'opacity-60' : ''}`}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div>
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                        verification.valid 
-                          ? 'bg-teal/10 text-teal' 
-                          : 'bg-red-100 text-red-600'
-                      }`}>
-                        {verification.valid ? 'Valid' : 'Invalid'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                          isRevoked
+                            ? 'bg-red-100 text-red-600'
+                            : verification.valid 
+                              ? 'bg-teal/10 text-teal' 
+                              : 'bg-red-100 text-red-600'
+                        }`}>
+                          {isRevoked ? 'Revoked' : verification.valid ? 'Valid' : 'Invalid'}
+                        </span>
+                      </div>
                       <h3 className="font-semibold text-brown mt-2">
                         {proof.statement}
                       </h3>
                     </div>
-                    <button
-                      onClick={() => copyToClipboard(proof)}
-                      className="p-2 rounded-lg hover:bg-cream-dark transition-colors"
-                      title="Copy shareable link"
-                    >
-                      {copiedId === proof.id ? (
-                        <Check className="w-5 h-5 text-teal" />
-                      ) : (
-                        <Copy className="w-5 h-5 text-brown-light" />
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => showQRCode(proof)}
+                        className="p-2 rounded-lg hover:bg-cream-dark transition-colors"
+                        title="Show QR code"
+                      >
+                        <QrCode className="w-5 h-5 text-brown-light" />
+                      </button>
+                      <button
+                        onClick={() => copyToClipboard(proof)}
+                        className="p-2 rounded-lg hover:bg-cream-dark transition-colors"
+                        title="Copy shareable link"
+                      >
+                        {copiedId === proof.id ? (
+                          <Check className="w-5 h-5 text-teal" />
+                        ) : (
+                          <Copy className="w-5 h-5 text-brown-light" />
+                        )}
+                      </button>
+                      {proof.ipfsHash && !isRevoked && (
+                        <button
+                          onClick={() => handleRevokeProof(proof)}
+                          disabled={isRevoking}
+                          className="p-2 rounded-lg hover:bg-red-50 transition-colors text-brown-light hover:text-red-500 disabled:opacity-50"
+                          title="Revoke this proof"
+                        >
+                          {isRevoking ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Ban className="w-5 h-5" />
+                          )}
+                        </button>
                       )}
-                    </button>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-4">

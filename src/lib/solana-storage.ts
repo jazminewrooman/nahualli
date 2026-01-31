@@ -9,6 +9,7 @@ const RPC_URL = import.meta.env.VITE_HELIUS_RPC_URL || 'https://api.devnet.solan
 // Prefix for Nahualli memos to identify them
 const MEMO_PREFIX = 'NAHUALLI:'
 const ZK_PROOF_PREFIX = 'NAHUALLI_ZK:'
+const REVOKE_PREFIX = 'NAHUALLI_REVOKE:'
 
 export interface OnChainResult {
   signature: string
@@ -233,4 +234,133 @@ export async function fetchZKProofsFromChain(walletAddress: string): Promise<OnC
 export function getExplorerUrl(signature: string): string {
   const cluster = RPC_URL.includes('devnet') ? 'devnet' : 'mainnet-beta'
   return `https://explorer.solana.com/tx/${signature}?cluster=${cluster}`
+}
+
+/**
+ * Revoke a ZK proof by storing a revocation memo on Solana
+ * Format: NAHUALLI_REVOKE:<ipfsHash>:<timestamp>
+ */
+export async function revokeProofOnChain(
+  ipfsHash: string,
+  signTransaction: (tx: Transaction) => Promise<Transaction>,
+  publicKey: PublicKey
+): Promise<string> {
+  const connection = new Connection(RPC_URL, 'confirmed')
+  
+  const timestamp = Date.now()
+  const memoContent = `${REVOKE_PREFIX}${ipfsHash}:${timestamp}`
+  
+  const memoInstruction = new TransactionInstruction({
+    keys: [{ pubkey: publicKey, isSigner: true, isWritable: false }],
+    programId: MEMO_PROGRAM_ID,
+    data: Buffer.from(memoContent, 'utf-8'),
+  })
+  
+  const transaction = new Transaction().add(memoInstruction)
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash()
+  transaction.recentBlockhash = blockhash
+  transaction.lastValidBlockHeight = lastValidBlockHeight
+  transaction.feePayer = publicKey
+  
+  const signedTx = await signTransaction(transaction)
+  const signature = await connection.sendRawTransaction(signedTx.serialize())
+  
+  await connection.confirmTransaction({
+    signature,
+    blockhash,
+    lastValidBlockHeight,
+  })
+  
+  console.log('Proof revoked on Solana:', signature)
+  return signature
+}
+
+/**
+ * Check if a proof has been revoked on Solana
+ * Searches for NAHUALLI_REVOKE memo for the given IPFS hash
+ */
+export async function isProofRevoked(ipfsHash: string, ownerAddress?: string): Promise<{ revoked: boolean; revokedAt?: number; signature?: string }> {
+  const connection = new Connection(RPC_URL, 'confirmed')
+  
+  try {
+    // If we know the owner, search their transactions
+    if (ownerAddress) {
+      const publicKey = new PublicKey(ownerAddress)
+      const signatures = await connection.getSignaturesForAddress(publicKey, {
+        limit: 100,
+      })
+      
+      for (const sig of signatures) {
+        try {
+          const tx = await connection.getTransaction(sig.signature, {
+            maxSupportedTransactionVersion: 0,
+          })
+          
+          if (!tx?.meta?.logMessages) continue
+          
+          for (const log of tx.meta.logMessages) {
+            if (log.includes(REVOKE_PREFIX) && log.includes(ipfsHash)) {
+              const revokeMatch = log.match(/NAHUALLI_REVOKE:([^:]+):(\d+)/)
+              if (revokeMatch && revokeMatch[1] === ipfsHash) {
+                return {
+                  revoked: true,
+                  revokedAt: parseInt(revokeMatch[2]),
+                  signature: sig.signature,
+                }
+              }
+            }
+          }
+        } catch {
+          continue
+        }
+      }
+    }
+    
+    return { revoked: false }
+  } catch (error) {
+    console.error('Failed to check revocation status:', error)
+    return { revoked: false }
+  }
+}
+
+/**
+ * Fetch all revoked proof hashes for a wallet
+ */
+export async function fetchRevokedProofs(walletAddress: string): Promise<string[]> {
+  const connection = new Connection(RPC_URL, 'confirmed')
+  const publicKey = new PublicKey(walletAddress)
+  
+  try {
+    const signatures = await connection.getSignaturesForAddress(publicKey, {
+      limit: 100,
+    })
+    
+    const revokedHashes: string[] = []
+    
+    for (const sig of signatures) {
+      try {
+        const tx = await connection.getTransaction(sig.signature, {
+          maxSupportedTransactionVersion: 0,
+        })
+        
+        if (!tx?.meta?.logMessages) continue
+        
+        for (const log of tx.meta.logMessages) {
+          if (log.includes(REVOKE_PREFIX)) {
+            const revokeMatch = log.match(/NAHUALLI_REVOKE:([^:]+):(\d+)/)
+            if (revokeMatch) {
+              revokedHashes.push(revokeMatch[1])
+            }
+          }
+        }
+      } catch {
+        continue
+      }
+    }
+    
+    return revokedHashes
+  } catch (error) {
+    console.error('Failed to fetch revoked proofs:', error)
+    return []
+  }
 }

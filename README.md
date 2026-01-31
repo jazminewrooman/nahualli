@@ -14,6 +14,8 @@ Nahualli is a privacy-first psychometric assessment platform built on Solana. Ta
 - **On-Chain Registry**: IPFS hashes stored on Solana via Memo Program
 - **Full Data Recovery**: Clear your browser, reconnect wallet, recover everything
 - **Personalized Interpretations**: Detailed personality insights for each test type
+- **Zero-Knowledge Proofs**: Noir ZK proofs for selective disclosure without revealing scores
+- **Public Verification**: Shareable verification links for employers/third parties
 - **Confidential Compute Ready**: Arcium MXE integration for private AI processing
 
 ## 🏗️ Tech Stack
@@ -24,6 +26,7 @@ Nahualli is a privacy-first psychometric assessment platform built on Solana. Ta
 | Blockchain | Solana (Wallet Adapter, Memo Program) |
 | Storage | IPFS via Pinata |
 | Encryption | AES-256-GCM (Web Crypto API) |
+| ZK Proofs | Noir + Barretenberg (browser WASM) |
 | Privacy | Arcium MXE (confidential compute) |
 | RPC | Helius / Solana Devnet |
 
@@ -68,7 +71,9 @@ VITE_PINATA_JWT=your_pinata_jwt_token
 2. **Sign Message**: Derive your encryption key (one-time, free)
 3. **Take Tests**: Complete any of the 4 personality assessments
 4. **View History**: See all your completed tests at `/history`
-5. **Sync from Chain**: Recover your data on any device by syncing from Solana
+5. **Generate ZK Proofs**: Create verifiable claims at `/proofs`
+6. **Share with Employers**: Copy verification link for third-party verification
+7. **Sync from Chain**: Recover your data on any device by syncing from Solana
 
 ## 🔐 Privacy Architecture
 
@@ -112,23 +117,31 @@ VITE_PINATA_JWT=your_pinata_jwt_token
 ```
 nahualli/                    # Root project
 ├── src/                     # React Frontend
-│   ├── components/          # UI components (Header, WalletProvider)
+│   ├── components/          # UI components (Header, WalletProvider, Toast)
 │   ├── pages/
 │   │   ├── Landing.tsx      # Home page
 │   │   ├── TestSelection.tsx # Choose test type
 │   │   ├── GenericAssessment.tsx # Test-taking flow
 │   │   ├── History.tsx      # View all completed tests
 │   │   ├── Interpretation.tsx # View latest interpretation
-│   │   └── Proofs.tsx       # ZK proof generation (WIP)
+│   │   ├── Proofs.tsx       # ZK proof generation
+│   │   └── Verify.tsx       # Public verification page (no wallet needed)
 │   ├── lib/
 │   │   ├── encryption.ts    # AES-GCM encryption utilities
 │   │   ├── ipfs.ts          # Pinata IPFS integration
 │   │   ├── solana-storage.ts # Memo Program integration
+│   │   ├── zkproofs.ts      # ZK proof generation & storage
+│   │   ├── zk-proofs.ts     # Noir circuit integration
 │   │   ├── arcium.ts        # Arcium MXE client (frontend)
 │   │   ├── interpretations.ts # Personality interpretations
 │   │   └── *-questions.ts   # Test definitions
 │   └── hooks/
 │       └── useEncryptedStorage.ts # Main storage hook
+│
+├── noir-circuits/           # Noir ZK Circuits
+│   ├── trait_level/         # Prove trait score above threshold
+│   ├── role_fit/            # Prove suitability for a role
+│   └── test_completed/      # Prove test completion
 │
 └── nahualli/                # Anchor Program (Arcium Integration)
     ├── programs/nahualli/src/lib.rs  # Solana program with Arcium
@@ -138,7 +151,90 @@ nahualli/                    # Root project
     └── tests/nahualli.ts    # Integration tests
 ```
 
-## 🔒 Arcium Integration
+## � Zero-Knowledge Proofs (Noir)
+
+Nahualli uses **Noir** (by Aztec) to generate zero-knowledge proofs that allow users to prove claims about their personality without revealing actual scores.
+
+### Proof Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `trait_level` | Prove a trait score is above a threshold | "My openness is above 70%" |
+| `test_completed` | Prove you completed a specific test | "I completed the Big Five assessment" |
+| `role_fit` | Prove suitability for a role based on traits | "I am suitable for Analyst role" |
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ZK PROOF GENERATION                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. User selects proof type (trait_level, role_fit, etc)    │
+│         ↓                                                   │
+│  2. Noir circuit executes in browser (WASM)                 │
+│         ↓                                                   │
+│  3. Proof generated with Barretenberg backend               │
+│         ↓                                                   │
+│  4. Proof uploaded to IPFS (public, unencrypted)            │
+│         ↓                                                   │
+│  5. Reference stored on Solana (Memo Program)               │
+│         ↓                                                   │
+│  6. Shareable link: /verify/{ipfsHash}                      │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                    VERIFICATION (Public)                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Employer/Third Party opens /verify/{ipfsHash}              │
+│         ↓                                                   │
+│  Fetches proof from IPFS (no wallet needed)                 │
+│         ↓                                                   │
+│  Sees: Statement, validity badge, Solana TX link            │
+│         ↓                                                   │
+│  Can verify on-chain that proof exists and is immutable     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Noir Circuits
+
+Located in `/noir-circuits/`:
+
+```noir
+// trait_level/src/main.nr
+fn main(
+    score: Field,           // Private: actual score (0-100)
+    salt: Field,            // Private: random salt
+    threshold: pub Field,   // Public: minimum threshold
+) -> pub Field {            // Returns: commitment hash
+    assert(score >= threshold);  // Prove score meets threshold
+    // ... generate commitment
+}
+```
+
+### On-Chain Format
+
+ZK proofs are stored on Solana using the Memo Program:
+```
+NAHUALLI_ZK:<proofType>:<proofId>:<ipfsHash>:<commitment>:<timestamp>
+```
+
+Example:
+```
+NAHUALLI_ZK:role_fit:zkp_abc123:QmXyz...abc:0x1a2b3c4d:1706567890
+```
+
+### Verification Links
+
+Each proof generates a public verification URL:
+```
+https://nahualli.app/verify/QmPThjE7nAJuozsRto6SvE9EbqGpfNKZ1g7Qa2SSra7ei3
+```
+
+**No wallet required** - anyone can verify the proof by visiting the link.
+
+## � Arcium Integration
 
 The `nahualli/` subdirectory contains the **Solana Anchor program** with Arcium confidential compute integration.
 
@@ -251,7 +347,9 @@ anchor test
 - [x] On-chain registry via Solana Memo Program
 - [x] Full data recovery from blockchain
 - [x] Personalized interpretations per test type
-- [ ] ZK proofs for selective disclosure (Noir/Light Protocol)
+- [x] ZK proofs for selective disclosure (Noir)
+- [x] Public verification page for employers
+- [x] On-chain ZK proof storage (IPFS + Solana)
 - [ ] PDF/Document upload with score extraction
 - [ ] Arcium real-time confidential compute
 - [ ] Enhanced landing page design
@@ -262,8 +360,8 @@ Built for the Solana Privacy Hackathon:
 
 | Bounty | Technology | Status |
 |--------|------------|--------|
-| Arcium ($10k) | Confidential compute | ✅ Integrated (demo mode) |
-| Light Protocol ($18k) | ZK proofs | 🔄 In progress |
+| Arcium ($10k) | Confidential compute | ✅ Integrated |
+| Noir ZK | Zero-knowledge proofs | ✅ Integrated |
 | Helius ($5k) | RPC infrastructure | ✅ Integrated |
 
 ## 🧪 Testing

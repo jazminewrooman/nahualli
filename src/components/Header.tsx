@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Shield } from 'lucide-react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { useWallet } from '@solana/wallet-adapter-react'
 
@@ -10,10 +9,10 @@ export function Header() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-cream/80 backdrop-blur-sm border-b border-cream-dark">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-6 py-1 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-          <Shield className="w-8 h-8 text-teal" />
-          <span className="font-serif text-2xl font-semibold text-brown">NAHUALLI</span>
+          <img src="/images/logo1.png" alt="Nahualli" className="w-20 h-20 object-contain" />
+          <img src="/images/nahualli.jpg" alt="Nahualli" className="w-50 h-20 object-contain" />
         </Link>
         
         <nav className="hidden md:flex items-center gap-6">

@@ -246,7 +246,7 @@ export async function generateZKProofAsync(
           trait: request.role
         }
         
-        statement = `I am suitable for ${request.role} role (ZK verified)`
+        statement = `This candidate is suitable for ${request.role} role (ZK verified)`
         publicInputs = {
           role: request.role,
           fit: true,

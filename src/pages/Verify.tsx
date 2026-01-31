@@ -45,7 +45,7 @@ export function Verify() {
   const [proof, setProof] = useState<ProofData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [proofSource, setProofSource] = useState<'ipfs' | 'query'>('ipfs')
+  const [, setProofSource] = useState<'ipfs' | 'query'>('ipfs')
 
   useEffect(() => {
     async function loadProof() {
@@ -207,7 +207,7 @@ export function Verify() {
               <p className="text-xs text-brown-light mb-1">Wallet</p>
               <p className="font-medium text-brown flex items-center gap-2">
                 <User className="w-4 h-4" />
-                {truncateAddress(proof.walletAddress)}
+                {truncateAddress(proof.walletAddress || '')}
               </p>
             </div>
           </div>

@@ -22,6 +22,7 @@ function App() {
           <Route path="/interpretation" element={<Interpretation />} />
           <Route path="/history" element={<History />} />
           <Route path="/verify/:ipfsHash" element={<Verify />} />
+          <Route path="/verify" element={<Verify />} />
           <Route path="/docs" element={<Docs />} />
         </Routes>
       </WalletProvider>

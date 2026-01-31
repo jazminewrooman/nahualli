@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { CheckCircle, ExternalLink, Clock, User, Loader2, AlertTriangle } from 'lucide-react'
 import { fetchZKProofFromIPFS, getIPFSUrl } from '../lib/ipfs'
 import { getExplorerUrl } from '../lib/solana-storage'
@@ -11,7 +11,7 @@ interface ProofData {
   proof: string
   publicInputs: Record<string, string | number | boolean>
   createdAt: number
-  walletAddress: string
+  walletAddress?: string
   noirProof?: {
     proof: string
     commitment: string
@@ -20,6 +20,7 @@ interface ProofData {
   }
   ipfsHash?: string
   solanaSignature?: string
+  expiresAt?: number
 }
 
 function formatDate(timestamp: number): string {
@@ -33,18 +34,47 @@ function formatDate(timestamp: number): string {
 }
 
 function truncateAddress(address: string): string {
+  if (!address) return 'N/A'
   if (address.length <= 12) return address
   return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
 export function Verify() {
   const { ipfsHash } = useParams<{ ipfsHash: string }>()
+  const [searchParams] = useSearchParams()
   const [proof, setProof] = useState<ProofData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [proofSource, setProofSource] = useState<'ipfs' | 'query'>('ipfs')
 
   useEffect(() => {
     async function loadProof() {
+      // Check for base64 encoded proof in query params first
+      const queryProof = searchParams.get('proof')
+      
+      if (queryProof) {
+        try {
+          const decoded = JSON.parse(atob(queryProof))
+          const proofData: ProofData = {
+            id: decoded.id || 'query_proof',
+            type: decoded.type || 'unknown',
+            statement: decoded.statement || 'Proof statement',
+            proof: decoded.proof || '',
+            publicInputs: decoded.publicInputs || {},
+            createdAt: decoded.publicInputs?.timestamp || Date.now(),
+            walletAddress: decoded.walletAddress,
+            expiresAt: decoded.expiresAt
+          }
+          setProof(proofData)
+          setProofSource('query')
+          setLoading(false)
+          return
+        } catch (e) {
+          console.error('Failed to decode query proof:', e)
+        }
+      }
+
+      // Fall back to IPFS hash
       if (!ipfsHash) {
         setError('No proof ID provided')
         setLoading(false)
@@ -73,6 +103,7 @@ export function Verify() {
           ipfsHash
         }
         setProof(proofData)
+        setProofSource('ipfs')
       } catch (e) {
         console.error('Failed to load proof:', e)
         setError('Failed to load proof from IPFS')
@@ -82,7 +113,7 @@ export function Verify() {
     }
 
     loadProof()
-  }, [ipfsHash])
+  }, [ipfsHash, searchParams])
 
   if (loading) {
     return (
@@ -199,31 +230,35 @@ export function Verify() {
           )}
 
           {/* Verification Links */}
-          <div className="border-t border-cream-dark pt-6">
-            <p className="text-sm text-brown-light mb-3">Verify On-Chain</p>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href={getIPFSUrl(ipfsHash!)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" />
-                View on IPFS
-              </a>
-              {proof.solanaSignature && (
-                <a
-                  href={getExplorerUrl(proof.solanaSignature)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-teal/10 text-teal rounded-lg hover:bg-teal/20 transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View on Solana
-                </a>
-              )}
+          {(ipfsHash || proof.solanaSignature) && (
+            <div className="border-t border-cream-dark pt-6">
+              <p className="text-sm text-brown-light mb-3">Verify On-Chain</p>
+              <div className="flex flex-wrap gap-3">
+                {ipfsHash && (
+                  <a
+                    href={getIPFSUrl(ipfsHash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    View on IPFS
+                  </a>
+                )}
+                {proof.solanaSignature && (
+                  <a
+                    href={getExplorerUrl(proof.solanaSignature)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 bg-teal/10 text-teal rounded-lg hover:bg-teal/20 transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    View on Solana
+                  </a>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Technical Details (Collapsible) */}
@@ -236,10 +271,12 @@ export function Verify() {
               <p className="text-xs text-brown-light mb-1">Proof ID</p>
               <p className="font-mono text-sm text-brown break-all">{proof.id}</p>
             </div>
-            <div>
-              <p className="text-xs text-brown-light mb-1">IPFS Hash</p>
-              <p className="font-mono text-sm text-brown break-all">{ipfsHash}</p>
-            </div>
+            {ipfsHash && (
+              <div>
+                <p className="text-xs text-brown-light mb-1">IPFS Hash</p>
+                <p className="font-mono text-sm text-brown break-all">{ipfsHash}</p>
+              </div>
+            )}
             {proof.noirProof && (
               <>
                 <div>

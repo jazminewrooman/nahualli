@@ -3,7 +3,6 @@ import type { FC, ReactNode } from 'react'
 import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@solana/wallet-adapter-react'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
-import { clusterApiUrl } from '@solana/web3.js'
 
 import '@solana/wallet-adapter-react-ui/styles.css'
 
@@ -12,7 +11,10 @@ interface Props {
 }
 
 export const WalletProvider: FC<Props> = ({ children }) => {
-  const endpoint = useMemo(() => clusterApiUrl('devnet'), [])
+  // Use Helius RPC for production (avoids 403 from public Solana RPC)
+  const endpoint = useMemo(() => 
+    import.meta.env.VITE_HELIUS_RPC_URL || 'https://api.devnet.solana.com', 
+  [])
   
   const wallets = useMemo(
     () => [

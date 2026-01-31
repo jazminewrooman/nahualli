@@ -20,6 +20,7 @@ export function Header() {
             <>
               <a href="#features" className="text-brown-light hover:text-brown transition-colors">Features</a>
               <a href="#how-it-works" className="text-brown-light hover:text-brown transition-colors">How it Works</a>
+              <Link to="/docs" className="text-brown-light hover:text-brown transition-colors">Docs</Link>
             </>
           ) : connected && (
             <>
@@ -45,7 +46,30 @@ export function Header() {
           )}
         </nav>
 
-        <WalletMultiButton className="!bg-brown !text-cream !rounded-full !px-6 !py-2 !font-sans !text-sm hover:!bg-brown-light !transition-colors" />
+        <div className="flex items-center gap-3">
+          {isHome && (
+            <Link 
+              to="/tests" 
+              className="bg-white text-brown border border-cream-dark px-6 rounded-full font-sans text-sm font-medium hover:bg-cream transition-colors h-[36px] flex items-center"
+            >
+              Enter App
+            </Link>
+          )}
+          <WalletMultiButton 
+            style={{ 
+              backgroundColor: 'white', 
+              color: '#5D4E37', 
+              border: '1px solid #E8E4DC',
+              borderRadius: '9999px',
+              padding: '0 24px',
+              fontSize: '14px',
+              fontWeight: 500,
+              fontFamily: 'sans-serif',
+              height: '36px',
+              lineHeight: '36px'
+            }} 
+          />
+        </div>
       </div>
     </header>
   )

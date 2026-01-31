@@ -12,10 +12,8 @@ export default defineConfig({
     },
   },
   server: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
-      'Cross-Origin-Embedder-Policy': 'credentialless',
-    },
+    // Headers removed - they conflict with Phantom wallet popup communication
+    // Noir/Barretenberg WASM works without them in modern browsers
   },
   build: {
     target: 'esnext',

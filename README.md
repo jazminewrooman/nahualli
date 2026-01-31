@@ -351,18 +351,6 @@ anchor test
 - [x] Public verification page for employers
 - [x] On-chain ZK proof storage (IPFS + Solana)
 - [ ] PDF/Document upload with score extraction
-- [ ] Arcium real-time confidential compute
-- [ ] Enhanced landing page design
-
-## 🏆 Hackathon Bounties
-
-Built for the Solana Privacy Hackathon:
-
-| Bounty | Technology | Status |
-|--------|------------|--------|
-| Arcium ($10k) | Confidential compute | ✅ Integrated |
-| Noir ZK | Zero-knowledge proofs | ✅ Integrated |
-| Helius ($5k) | RPC infrastructure | ✅ Integrated |
 
 ## 🧪 Testing
 
@@ -383,6 +371,6 @@ MIT License
 
 ---
 
-**Built with 💚 for the Solana Privacy Hackathon 2025**
+**Built with 💚 for the Solana Privacy Hackathon 2026**
 
-*Nahualli - Protecting your digital spirit*
+*Nahualli - Your hidden self, cryptographically protected*

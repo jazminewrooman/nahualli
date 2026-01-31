@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Shield, CheckCircle, ExternalLink, Clock, User, Loader2, AlertTriangle } from 'lucide-react'
+import { CheckCircle, ExternalLink, Clock, User, Loader2, AlertTriangle } from 'lucide-react'
 import { fetchZKProofFromIPFS, getIPFSUrl } from '../lib/ipfs'
 import { getExplorerUrl } from '../lib/solana-storage'
 
@@ -128,10 +128,10 @@ export function Verify() {
     <div className="min-h-screen bg-gradient-to-b from-cream to-cream-dark">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-cream-dark">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-6 py-1 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <Shield className="w-8 h-8 text-teal" />
-            <span className="font-serif text-xl font-bold text-brown">Nahualli</span>
+            <img src="/images/logo1.png" alt="Nahualli" className="w-20 h-20 object-contain" />
+            <img src="/images/nahualli.jpg" alt="Nahualli" className="w-50 h-20 object-contain" />
           </Link>
           <span className="text-sm text-brown-light">Proof Verification</span>
         </div>

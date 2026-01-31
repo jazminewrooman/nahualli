@@ -7,6 +7,7 @@ import { Proofs } from './pages/Proofs'
 import { Interpretation } from './pages/Interpretation'
 import { History } from './pages/History'
 import { Verify } from './pages/Verify'
+import { Docs } from './pages/Docs'
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="/interpretation" element={<Interpretation />} />
           <Route path="/history" element={<History />} />
           <Route path="/verify/:ipfsHash" element={<Verify />} />
+          <Route path="/docs" element={<Docs />} />
         </Routes>
       </WalletProvider>
     </BrowserRouter>

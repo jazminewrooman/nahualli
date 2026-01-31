@@ -56,68 +56,50 @@ export function TestSelection() {
               <Link
                 key={test.id}
                 to={`/assessment/${test.id}`}
-                className="relative rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all hover:-translate-y-1 group"
+                className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all hover:-translate-y-1 group"
               >
-                {/* Background Image */}
+                {/* Card Image */}
                 {bgImage && (
                   <div 
-                    className="absolute inset-0 bg-cover bg-center opacity-40"
+                    className="h-40 bg-cover bg-center"
                     style={{ backgroundImage: `url(${bgImage})` }}
                   />
                 )}
                 
-                {/* Content with dark overlay for readability */}
-                <div className={`relative p-6 ${bgImage ? 'bg-brown/50' : 'bg-white'}`}>
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1">
-                      <h3 className={`font-serif text-xl font-semibold mb-2 transition-colors ${
-                        bgImage 
-                          ? 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] group-hover:text-teal-light' 
-                          : 'text-brown group-hover:text-teal'
-                      }`}>
-                        {test.name}
-                      </h3>
-                      <p className={`text-sm mb-4 ${
-                        bgImage 
-                          ? 'text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' 
-                          : 'text-brown-light'
-                      }`}>
-                        {test.description}
-                      </p>
-                      
-                      <div className={`flex items-center gap-4 text-xs ${
-                        bgImage ? 'text-white/80' : 'text-brown-light'
-                      }`}>
-                        <span className="flex items-center gap-1">
-                          <BarChart3 className="w-4 h-4" />
-                          {test.questionCount} questions
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {test.estimatedTime}
-                        </span>
-                      </div>
-                      
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {test.dimensions.map((dim) => (
-                          <span
-                            key={dim}
-                            className={`px-2 py-1 rounded-full text-xs ${
-                              bgImage 
-                                ? 'bg-white/20 text-white border border-white/30' 
-                                : 'bg-cream-dark/50 text-brown-light'
-                            }`}
-                          >
-                            {dim}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <ArrowRight className={`w-5 h-5 group-hover:translate-x-1 transition-all ${
-                      bgImage 
-                        ? 'text-white/80 group-hover:text-white' 
-                        : 'text-brown-light group-hover:text-teal'
-                    }`} />
+                {/* Card Content */}
+                <div className="p-6">
+                  <h3 className="font-serif text-xl font-semibold text-brown mb-2 group-hover:text-teal transition-colors">
+                    {test.name}
+                  </h3>
+                  <p className="text-sm text-brown-light mb-4">
+                    {test.description}
+                  </p>
+                  
+                  <div className="flex items-center gap-4 text-xs text-brown-light">
+                    <span className="flex items-center gap-1">
+                      <BarChart3 className="w-4 h-4" />
+                      {test.questionCount} questions
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      {test.estimatedTime}
+                    </span>
+                  </div>
+                  
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {test.dimensions.map((dim) => (
+                      <span
+                        key={dim}
+                        className="px-2 py-1 rounded-full text-xs bg-cream-dark/50 text-brown-light"
+                      >
+                        {dim}
+                      </span>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-4 flex items-center text-teal text-sm font-medium">
+                    Start Assessment
+                    <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               </Link>

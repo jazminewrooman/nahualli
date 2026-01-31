@@ -8,25 +8,13 @@ export function Landing() {
     <div className="min-h-screen bg-cream">
       <Header />
       
-      {/* Hero Section - Full Width Image */}
-      <section className="relative w-full h-screen">
+      {/* Hero Section - Full Width Image with aspect ratio preserved */}
+      <section className="relative w-full pt-20">
         <img 
-          src="/images/nahualli2.jpg" 
+          src="/images/nahualli3.jpg" 
           alt="Nahualli - Your digital guardian" 
-          className="absolute inset-0 w-full h-full object-cover"
+          className="w-full h-auto"
         />
-        {/* Dark overlay for text readability */}
-        <div className="absolute inset-0" />
-        
-        {/* Hero Content */}
-        <div className="relative z-10 flex flex-col items-center justify-end h-full text-center px-6 pb-24">
-          <Link 
-            to="/tests"
-            className="inline-block bg-white text-brown px-8 py-4 rounded-full font-semibold hover:bg-cream transition-colors text-lg shadow-lg"
-          >
-            Enter the App
-          </Link>
-        </div>
       </section>
 
       {/* Value Proposition */}

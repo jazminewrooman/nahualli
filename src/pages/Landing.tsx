@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { Lock, Fingerprint, Network } from 'lucide-react'
 import { Header } from '../components/Header'
 import { FeatureCard } from '../components/FeatureCard'
